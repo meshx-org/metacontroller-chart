@@ -1,0 +1,44 @@
+name: Helm
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.tgz'
+
+jobs:
+  publish:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Chart Checkout
+        uses: actions/checkout@v2
+      
+      - name: Helm Installation
+        uses: azure/setup-helm@v1.1
+        with:
+          version: v3.7.0
+      
+      - name: Helm Repository Checkout
+        uses: actions/checkout@v2
+        with:
+          repository: meshx-org/metacontroller
+          token: ${{ secrets.BOT_GH_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: true
+          ref: master
+          path: metacontroller-chart
+      
+      - name: Helm Package
+        run: helm package metacontroller-chart/deploy/helm/metacontroller --version "0.1.0+$(git rev-parse --short "$GITHUB_SHA")" --destination metacontroller-chart
+      
+      - name: Helm Push
+        env:
+          GITHUB_TOKEN: ${{ secrets.BOT_GH_TOKEN }}
+        run: |
+          git config --global user.email "chartbot@meshx.co"
+          git config --global user.name "MeshX Chart Bot"
+          CHART_PACKAGE_NAME="metacontroller-0.1.0+$(git rev-parse --short "$GITHUB_SHA").tgz"
+          cd metacontroller-chart
+          git add "$CHART_PACKAGE_NAME"
+          git commit -m "$CHART_PACKAGE_NAME"
+          git push origin main
